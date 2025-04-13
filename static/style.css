@@ -841,12 +841,7 @@ button:disabled {
 }
 
 
-
-@keyframes typing-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
+/*typing in progress*/
 .typing-indicator {
   background: #f0f0f0;
   padding: 8px 15px;
@@ -859,26 +854,6 @@ button:disabled {
 .hidden {
   display: none;
 }
-
-.toast {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 12px 24px;
-  border-radius: 4px;
-  color: white;
-  z-index: 1000;
-  animation: fadeIn 0.3s;
-}
-.toast.error { background-color: #ff4444; }
-.toast.success { background-color: #00C851; }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-
 
 
 /* Private Chat Box */

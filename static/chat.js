@@ -306,7 +306,7 @@ window.openPrivateChat = async (nickname, firstName, lastName) => {
     const receiverOfNoti = localStorage.getItem("nickname");
     
     try {
-        // 1. Mark notifications as read
+        // Mark notifications as read
         const markReadResponse = await fetch('/mark-read', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -320,22 +320,22 @@ window.openPrivateChat = async (nickname, firstName, lastName) => {
             throw new Error('Failed to mark messages as read');
         }
 
-        // 2. Close current chat if open
+        // Close current chat if open
         if (currentOpenChat) {
             window.closeChat(currentOpenChat);
         }
 
-        // 3. Create or get chat box
+        // Create or get chat box
         const chatBox = document.getElementById(`chat-${nickname}`) || 
-                       createChatBox(nickname, firstName, lastName);
+        createChatBox(nickname, firstName, lastName);
 
-        // 4. Get message container (matches your createChatBox structure)
+        // Get message container (matches your createChatBox structure)
         const messageContainer = chatBox.querySelector('.chat-messages');
         if (!messageContainer) {
             throw new Error('Message container not found');
         }
 
-        // 5. Set up typing indicator (if not exists)
+        // Set up typing indicator (if not exists)
         let typingIndicator = document.getElementById(`typing-${nickname}`);
         if (!typingIndicator) {
             typingIndicator = document.createElement('div');
@@ -346,7 +346,7 @@ window.openPrivateChat = async (nickname, firstName, lastName) => {
             chatBox.insertBefore(typingIndicator, messageContainer);
         }
 
-        // 6. Set up typing detection
+        // Set up typing detection
         const messageInput = chatBox.querySelector(`#input-${nickname}`);
         let typingTimeout;
         
@@ -375,7 +375,7 @@ window.openPrivateChat = async (nickname, firstName, lastName) => {
         messageInput.removeEventListener('input', handleTypingInput);
         messageInput.addEventListener('input', handleTypingInput);
 
-        // 7. Show chat and load messages
+        // Show chat and load messages
         chatBox.style.display = "block";
         currentOpenChat = nickname;
         
@@ -388,17 +388,7 @@ window.openPrivateChat = async (nickname, firstName, lastName) => {
         alert("Failed to open chat: " + error.message);
     }
 };
-// Add this to your utilities
-function showToast(message, type = 'error') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
-}
+
     
     const createChatBox = (nickname, firstName, lastName) => {
         const chatBox = document.createElement("div");
