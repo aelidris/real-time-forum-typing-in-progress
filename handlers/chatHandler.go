@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"log"
@@ -11,6 +12,13 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+type TypingEvent struct {
+	Type     string `json:"type"`
+	Receiver string `json:"receiver"`
+	Sender   string `json:"sender"`
+	IsTyping bool   `json:"isTyping"`
+}
 
 type Message struct {
 	Sender          string `json:"sender"`
@@ -154,9 +162,10 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	defer cleanupClient(conn, nickname)
 
 	for {
-		var msg Message
-		if err := conn.ReadJSON(&msg); err != nil {
-			log.Println("Error reading message:", err)
+		// First read the message as raw JSON to check type
+		_, msgBytes, err := conn.ReadMessage()
+		if err != nil {
+			log.Println("Read error:", err)
 			mu.Lock()
 			delete(clients, conn)
 			broadcastOnlineUsers()
@@ -164,11 +173,38 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
+		// Check if it's a typing event
+		if bytes.Contains(msgBytes, []byte(`"type":"typing"`)) {
+			var typingEvent TypingEvent
+			if err := json.Unmarshal(msgBytes, &typingEvent); err == nil {
+				handleTypingEvent(typingEvent)
+				continue // Skip normal message processing
+			}
+		}
+
+		// Otherwise process as normal message
+		var msg Message
+		if err := json.Unmarshal(msgBytes, &msg); err != nil {
+			log.Println("Error parsing message:", err)
+			continue
+		}
+
 		saveMessage(msg.Sender, msg.Receiver, msg.Content)
 		if msg.Receiver != "" {
 			sendPrivateMessage(msg)
 		} else {
 			messages <- msg
+		}
+	}
+}
+
+func handleTypingEvent(event TypingEvent) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	for clientConn, client := range clients {
+		if client.nickname == event.Receiver {
+			clientConn.WriteJSON(event)
 		}
 	}
 }
@@ -235,6 +271,9 @@ func MarkNotificationsRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Deletion failed", http.StatusInternalServerError)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 
 	w.WriteHeader(http.StatusOK)
 }

@@ -95,6 +95,11 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
         switch (data.type) {
+            case "typing":
+                const typingElement = document.getElementById(`typing-${data.sender}`);
+                if (typingElement) {
+                    typingElement.classList.toggle('hidden', !data.isTyping);
+                }
             case "userRegistered":
             const newUser = data.user;
             if (!allUsers.some(u => u.nickname === newUser.nickname)) {
@@ -127,7 +132,8 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
             }
         }
       };
-    
+
+ 
     socket.onerror = (error) => {
         console.error("WebSocket error:", error);
     };
@@ -296,52 +302,118 @@ function setupScrollHandler(nickname) {
 }
     
     
-    window.openPrivateChat = async (nickname, firstName, lastName) => {
-
-        const recieverOfNoti = localStorage.getItem("nickname") 
-        try {
-            await fetch('/mark-read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    receiver: recieverOfNoti, 
-                    sender: nickname              
-                })
-            });
+window.openPrivateChat = async (nickname, firstName, lastName) => {
+    const receiverOfNoti = localStorage.getItem("nickname");
     
-            if (currentOpenChat) {
-                window.closeChat(currentOpenChat);
-            }
-    
-            const chatBox = document.getElementById(`chat-${nickname}`) || 
-            createChatBox(nickname, firstName, lastName);
-            
-            chatBox.style.display = "block";
-            currentOpenChat = nickname;
-            
-            await fetchHistoricalMessages(nickname);
-            setupScrollHandler(nickname);
-            resetUnreadCount(nickname);
-    
-        } catch (error) {
-            console.error("Chat opening failed:", error);
-            showToast("Failed to open chat");
+    try {
+        // 1. Mark notifications as read
+        const markReadResponse = await fetch('/mark-read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                receiver: receiverOfNoti, 
+                sender: nickname              
+            })
+        });
+        
+        if (!markReadResponse.ok) {
+            throw new Error('Failed to mark messages as read');
         }
-    };
+
+        // 2. Close current chat if open
+        if (currentOpenChat) {
+            window.closeChat(currentOpenChat);
+        }
+
+        // 3. Create or get chat box
+        const chatBox = document.getElementById(`chat-${nickname}`) || 
+                       createChatBox(nickname, firstName, lastName);
+
+        // 4. Get message container (matches your createChatBox structure)
+        const messageContainer = chatBox.querySelector('.chat-messages');
+        if (!messageContainer) {
+            throw new Error('Message container not found');
+        }
+
+        // 5. Set up typing indicator (if not exists)
+        let typingIndicator = document.getElementById(`typing-${nickname}`);
+        if (!typingIndicator) {
+            typingIndicator = document.createElement('div');
+            typingIndicator.id = `typing-${nickname}`;
+            typingIndicator.className = 'typing-indicator hidden';
+            typingIndicator.textContent = `${firstName} is typing...`;
+            // Insert after header but before messages
+            chatBox.insertBefore(typingIndicator, messageContainer);
+        }
+
+        // 6. Set up typing detection
+        const messageInput = chatBox.querySelector(`#input-${nickname}`);
+        let typingTimeout;
+        
+        const handleTypingInput = () => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'typing',
+                    sender: receiverOfNoti,
+                    receiver: nickname,
+                    isTyping: true
+                }));
+
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    socket.send(JSON.stringify({
+                        type: 'typing',
+                        sender: receiverOfNoti,
+                        receiver: nickname,
+                        isTyping: false
+                    }));
+                }, 1500);
+            }
+        };
+
+        // Remove previous listener to avoid duplicates
+        messageInput.removeEventListener('input', handleTypingInput);
+        messageInput.addEventListener('input', handleTypingInput);
+
+        // 7. Show chat and load messages
+        chatBox.style.display = "block";
+        currentOpenChat = nickname;
+        
+        await fetchHistoricalMessages(nickname);
+        setupScrollHandler(nickname);
+        resetUnreadCount(nickname);
+
+    } catch (error) {
+        console.error("Chat opening failed:", error);
+        alert("Failed to open chat: " + error.message);
+    }
+};
+// Add this to your utilities
+function showToast(message, type = 'error') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
     
     const createChatBox = (nickname, firstName, lastName) => {
         const chatBox = document.createElement("div");
         chatBox.id = `chat-${nickname}`;
         chatBox.className = "private-chat";
         chatBox.innerHTML = `
-          <div class="chat-header">
-            <h4>Chat with ${firstName} ${lastName}</h4>
-            <button class="close-chat">×</button>
-          </div>
-          <ul class="chat-messages" id="messages-${nickname}"></ul>
-          <input type="text" id="input-${nickname}" placeholder="Type a message...">
-          <button class="send-message">Send</button>
-        `;
+      <div class="chat-header">
+        <h4>Chat with ${firstName} ${lastName}</h4>
+        <button class="close-chat">×</button>
+      </div>
+      <div class="typing-container"></div>
+      <ul class="chat-messages" id="messages-${nickname}"></ul>
+      <input type="text" id="input-${nickname}" placeholder="Type a message...">
+      <button class="send-message">Send</button>
+    `;
         
         const input = chatBox.querySelector(`#input-${nickname}`);
         const sendButton = chatBox.querySelector('.send-message');
