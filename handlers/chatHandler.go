@@ -604,10 +604,6 @@ func queryMessages(currentUser, otherUser, offset, limit string) ([]Message, err
 		msgs = append(msgs, msg)
 	}
 
-	// Reverse the array so oldest messages appear first
-	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
-		msgs[i], msgs[j] = msgs[j], msgs[i]
-	}
 	return msgs, nil
 }
 

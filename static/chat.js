@@ -421,13 +421,7 @@ window.openPrivateChat = async (nickname, firstName, lastName) => {
     
     function handleKeyPress(event, nickname) {
         if (event.key === 'Enter') {
-            event.preventDefault();
-                if (window.sendMessageTimeout) {
-                clearTimeout(window.sendMessageTimeout);
-            }
-            window.sendMessageTimeout = setTimeout(() => {
-                sendPrivateMessage(nickname);
-            }, 500);
+            sendPrivateMessage(nickname);
         }
     }
 
